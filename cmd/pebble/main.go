@@ -5,9 +5,10 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path"
 	"strconv"
 
-	"github.com/letsencrypt/pebble/v2/ca"
+	pca "github.com/letsencrypt/pebble/v2/ca"
 	"github.com/letsencrypt/pebble/v2/cmd"
 	"github.com/letsencrypt/pebble/v2/db"
 	"github.com/letsencrypt/pebble/v2/va"
@@ -72,7 +73,35 @@ func main() {
 	}
 
 	db := db.NewMemoryStore()
-	ca := ca.New(logger, db, c.Pebble.OCSPResponderURL, alternateRoots, chainLength, c.Pebble.CertificateValidityPeriod)
+	ca := &pca.CAImpl{}
+	useXCA := false
+	if val, err := strconv.ParseBool(os.Getenv("USE_X_CA")); err == nil && val == true {
+		useXCA = true
+	}
+	logger.Printf("USE_X_CA is %t", useXCA)
+	if useXCA == true {
+		pathXCA := "/x-ca"
+		if val := os.Getenv("PATH_X_CA"); val != "" {
+			pathXCA = val
+		}
+		logger.Printf("PATH_X_CA is %s", pathXCA)
+
+		var rootKeyPath, tlsKeyPath string
+		if val, err := strconv.ParseBool(os.Getenv("IS_DES3_KEY")); err == nil && val == true {
+			rootKeyPath = path.Join(pathXCA, "ca/root-ca/private/root-ca-des3.key")
+			tlsKeyPath = path.Join(pathXCA, "ca/tls-ca/private/tls-ca-des3.key")
+		} else {
+			rootKeyPath = path.Join(pathXCA, "ca/root-ca/private/root-ca.key")
+			tlsKeyPath = path.Join(pathXCA, "ca/tls-ca/private/tls-ca.key")
+		}
+		rootCertPath := path.Join(pathXCA, "ca/root-ca.crt")
+		rootKeyPassword := os.Getenv("X_CA_ROOT_CA_PASSWORD")
+		tlsCertPath := path.Join(pathXCA, "ca/tls-ca.crt")
+		tlsKeyPassword := os.Getenv("X_CA_TLS_CA_PASSWORD")
+		ca = pca.LoadExistCa(logger, db, c.Pebble.CertificateValidityPeriod, rootKeyPath, rootCertPath, rootKeyPassword, tlsKeyPath, tlsCertPath, tlsKeyPassword)
+	} else {
+		ca = pca.New(logger, db, c.Pebble.OCSPResponderURL, alternateRoots, chainLength, c.Pebble.CertificateValidityPeriod)
+	}
 	va := va.New(logger, c.Pebble.HTTPPort, c.Pebble.TLSPort, *strictMode, *resolverAddress)
 
 	for keyID, key := range c.Pebble.ExternalAccountMACKeys {

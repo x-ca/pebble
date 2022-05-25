@@ -17,6 +17,8 @@ import (
 	"strings"
 	"time"
 
+	xca "github.com/x-ca/go-ca/ca"
+
 	"github.com/letsencrypt/pebble/v2/acme"
 	"github.com/letsencrypt/pebble/v2/core"
 	"github.com/letsencrypt/pebble/v2/db"
@@ -376,6 +378,74 @@ func New(log *log.Logger, db *db.MemoryStore, ocspResponderURL string, alternate
 	}
 
 	ca.log.Printf("Using certificate validity period of %d seconds", ca.certValidityPeriod)
+
+	return ca
+}
+
+func LoadExistCa(log *log.Logger, db *db.MemoryStore, certificateValidityPeriod uint, rootKeyPath, rootCertPath, rootKeyPassword, tlsKeyPath, tlsCertPath, tlsKeyPassword string) *CAImpl {
+	ca := &CAImpl{
+		log:                log,
+		db:                 db,
+		certValidityPeriod: defaultValidityPeriod,
+	}
+
+	rootCA, err := xca.LoadRootCA(rootKeyPath, rootCertPath, rootKeyPassword)
+	if err != nil {
+		ca.log.Fatal("load root ca cert error", err.Error())
+		return nil
+	}
+	tlsCA, err := xca.LoadTLSCA(tlsKeyPath, tlsCertPath, tlsKeyPassword)
+	if err != nil {
+		ca.log.Fatal("load tls ca cert error", err.Error())
+		return nil
+	}
+
+	ca.chains = make([]*chain, 1)
+	// load root ca
+	rootIssuer := &issuer{
+		key: rootCA.Key,
+		cert: &core.Certificate{
+			ID:   hex.EncodeToString(rootCA.Cert.SerialNumber.Bytes()),
+			Cert: rootCA.Cert,
+			DER:  rootCA.Cert.Raw,
+		},
+	}
+	_, err = ca.db.AddCertificate(rootIssuer.cert)
+	if err != nil {
+		ca.log.Fatal("add root ca cert to db error", err.Error())
+		return nil
+	}
+
+	// load tls/intermediates ca
+	tlsIssuer := &issuer{
+		key: tlsCA.Key,
+		cert: &core.Certificate{
+			ID:   hex.EncodeToString(tlsCA.Cert.SerialNumber.Bytes()),
+			Cert: tlsCA.Cert,
+			DER:  tlsCA.Cert.Raw,
+		},
+	}
+	_, err = ca.db.AddCertificate(tlsIssuer.cert)
+	if err != nil {
+		ca.log.Fatal("add tls ca cert to db error", err.Error())
+		return nil
+	}
+	if tlsCA.RootCert != nil && rootIssuer.cert != nil {
+		tlsIssuer.cert.IssuerChains = make([][]*core.Certificate, 1)
+		tlsIssuer.cert.IssuerChains[0] = []*core.Certificate{rootIssuer.cert}
+	}
+
+	ca.chains[0] = &chain{
+		root:          rootIssuer,
+		intermediates: []*issuer{tlsIssuer},
+	}
+
+	if certificateValidityPeriod != 0 && certificateValidityPeriod < 9223372038 {
+		ca.certValidityPeriod = certificateValidityPeriod
+	}
+	ca.log.Printf("Load certificate validity period of %d seconds", ca.certValidityPeriod)
+
+	ca.log.Printf("Load X-CA(https://github.com/x-ca/) done.")
 
 	return ca
 }

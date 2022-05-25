@@ -3,6 +3,7 @@ module github.com/letsencrypt/pebble/v2
 require (
 	github.com/letsencrypt/challtestsrv v1.2.1
 	github.com/miekg/dns v1.1.48
+	github.com/x-ca/go-ca v0.2.0
 	gopkg.in/square/go-jose.v2 v2.6.0
 )
 

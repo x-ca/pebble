@@ -8,6 +8,9 @@ github.com/letsencrypt/challtestsrv
 github.com/miekg/dns
 # github.com/stretchr/testify v1.7.0
 ## explicit; go 1.13
+# github.com/x-ca/go-ca v0.2.0
+## explicit; go 1.17
+github.com/x-ca/go-ca/ca
 # golang.org/x/crypto v0.0.0-20220411220226-7b82a4e95df4
 ## explicit; go 1.17
 golang.org/x/crypto/ed25519

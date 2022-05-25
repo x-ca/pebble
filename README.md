@@ -1,5 +1,61 @@
 # Pebble
 
+use [x-ca](https://github.com/x-ca/x-ca) as ca must config ENV:
+
+```
+USE_X_CA=true
+IS_DES3_KEY=true # true if x-ca/ca; false if go-ca
+cert valid day: "certificateValidityPeriod": 69120000 = 60*60*24*800(day)
+```
+
+- build Dokcer Image
+
+```
+make build
+make tag-latest
+```
+
+new image is: `xiexianbin/pebble:1` and `xiexianbin/pebble:latest`
+
+- start
+
+```
+# docker run -it -d -e "PEBBLE_VA_NOSLEEP=1" -p 14000:14000 -p 15000:15000  letsencrypt/pebble
+
+git clone git@github.com:x-ca/ca.git x-ca
+KEY_PWD=""
+docker run -it -d \
+  -e "PEBBLE_VA_NOSLEEP=1" \
+  -e "PEBBLE_VA_ALWAYS_VALID=1" \
+  -e "PEBBLE_CHAIN_LENGTH=2" \
+  -e "PEBBLE_ALTERNATE_ROOTS=0" \
+  -e "USE_X_CA=true" \
+  -e "IS_DES3_KEY=true" \
+  -e "X_CA_ROOT_CA_PASSWORD=${KEY_PWD}" \
+  -e "X_CA_TLS_CA_PASSWORD=${KEY_PWD}" \
+  -e "PATH_X_CA=/x-ca" \
+  -v $(pwd)/x-ca:/x-ca \
+  -p 14000:14000 \
+  -p 15000:15000 \
+  xiexianbin/pebble:latest
+```
+
+or custome cofig:
+
+```
+  -v $(pwd)/test:/test \
+```
+
+- test by curl
+
+```
+curl -k https://dev.xiexianbin.cn:14000/dir
+```
+
+- others
+
+其中 https://letsencrypt.org/zh-cn/docs/staging-environment/ 也提供v2的API可供开发调用。
+
 [![Build Status](https://travis-ci.org/letsencrypt/pebble.svg?branch=master)](https://travis-ci.org/letsencrypt/pebble)
 [![Coverage Status](https://coveralls.io/repos/github/letsencrypt/pebble/badge.svg?branch=cpu-goveralls)](https://coveralls.io/github/letsencrypt/pebble?branch=cpu-goveralls)
 [![Go Report Card](https://goreportcard.com/badge/github.com/letsencrypt/pebble)](https://goreportcard.com/report/github.com/letsencrypt/pebble)
@@ -9,8 +65,6 @@ is a small [ACME](https://github.com/ietf-wg-acme/acme) test server not suited
 for use as a production CA.
 
 ## !!! WARNING !!!
-
-![WARNING](https://media.giphy.com/media/IT6kBZ1k5oEeI/giphy.gif)
 
 Pebble is **NOT INTENDED FOR PRODUCTION USE**. Pebble is for **testing only**.
 
